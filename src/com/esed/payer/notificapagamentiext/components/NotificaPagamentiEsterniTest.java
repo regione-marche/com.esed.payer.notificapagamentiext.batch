@@ -20,7 +20,7 @@ public class NotificaPagamentiEsterniTest {
 		DataSourceFactoryImpl dataSourceFactory = new DataSourceFactoryImpl();
 		Properties dsProperties= new Properties();
 		dsProperties.put(DAOHelper.JDBC_DRIVER, "com.ibm.db2.jcc.DB2Driver");
-		dsProperties.put(DAOHelper.JDBC_URL, "jdbc:db2://10.10.75.135:60000/PAY00DB0:retrieveMessagesFromServerOnGetMessage=true;");
+		dsProperties.put(DAOHelper.JDBC_URL, "jdbc:db2://svdbdb201.seda.intra:60000/PAY00DB0:retrieveMessagesFromServerOnGetMessage=true;");
 		dsProperties.put(DAOHelper.JDBC_USER, "SE000SV");
 		dsProperties.put(DAOHelper.JDBC_PASSWORD, "SV!L09SE");
 		dsProperties.put("autocommit", "true");		//TODO da verificare
@@ -34,7 +34,7 @@ public class NotificaPagamentiEsterniTest {
 		Logger logger = Logger.getLogger(NotificaPagamentiEsterniCore.class);
 		String jobId = "";
 		String[] params = new String[]{ 
-				"CONFIGPATH      D:/ConfigFiles/Payer/pennacchietti/NotificaPagamentiEsterniBatch/notificapagamentiesternibatch.properties"
+				"CONFIGPATH      C:\\work\\giacani_pagonet\\ConfigFiles\\NotificaPagamentiEsterniBatch\\notificapagamentiesternibatch.properties"
 				,"CUTECUTE      000TO"
 //				,"CODENTE      99999"
 				};

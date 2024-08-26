@@ -4,6 +4,7 @@ import java.io.StringWriter;
 
 import javax.xml.bind.JAXB;
 
+@SuppressWarnings("unused")
 public class BaseServer {
 	/**
 	 * 

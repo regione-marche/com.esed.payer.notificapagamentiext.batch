@@ -3,7 +3,6 @@ package com.esed.payer.notificapagamentiext.components;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.rmi.RemoteException;
-import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,11 +18,10 @@ import javax.sql.DataSource;
 import javax.xml.rpc.ServiceException;
 
 import org.apache.log4j.Logger;
-import org.w3c.dom.Element;
 
-import com.esed.log.req.dati.LogWin;
 import com.esed.payer.notificapagamentiext.config.NotificaPagamentiEsterniContext;
 import com.esed.payer.notificapagamentiext.config.NotificaPagamentiEsterniResponse;
+import com.esed.payer.notificapagamentiext.dao.NotificaPagamentiEsterniDAO;
 import com.esed.payer.notificapagamentiext.model.NotificaPagamentiEsterniModel;
 import com.esed.payer.notificapagamentiext.util.LoggerUtil;
 import com.seda.bap.components.core.BapException;
@@ -32,12 +30,12 @@ import com.seda.bap.components.core.spi.PrintCodes;
 import com.seda.commons.properties.tree.PropertiesTree;
 import com.seda.data.dao.DAOHelper;
 import com.seda.data.datasource.DataSourceFactoryImpl;
-import com.seda.data.helper.Helper;
 import com.seda.emailsender.webservices.dati.EMailSenderRequestType;
 import com.seda.emailsender.webservices.dati.EMailSenderResponse;
 import com.seda.emailsender.webservices.source.EMailSenderInterface;
 import com.seda.emailsender.webservices.source.EMailSenderServiceLocator;
 import com.seda.emailsender.webservices.srv.EMailSenderFaultType;
+import com.seda.payer.core.bean.LogWin;
 import com.seda.payer.core.bean.NodoSpcRpt;
 import com.seda.payer.core.dao.NodoSpcDao;
 import com.seda.payer.core.exception.DaoException;
@@ -50,19 +48,18 @@ import com.seda.payer.pgec.webservice.commons.dati.ConfigPagamentoSingleResponse
 import com.seda.payer.pgec.webservice.commons.dati.RecuperaTransazioneRequestType;
 import com.seda.payer.pgec.webservice.commons.dati.RecuperaTransazioneResponseType;
 
+@SuppressWarnings("unused")
 public class NotificaPagamentiEsterniCore extends BaseServer {
-	
 
 //	private Properties config = null;
 	private PropertiesTree configTree = null;
-	
 	private static Logger log = Logger.getLogger(NotificaPagamentiEsterniCore.class);
 	private static String myPrintingKeyPAG_REPORT = "REPORT";
 	private static String myPrintingKeyPAG_SYSOUT = "SYSOUT";
 
 	Calendar cal = Calendar.getInstance();
 	private NotificaPagamentiEsterniContext notificaPagamentiEsterniContext;
-	
+
 	DataSource datasource;
 	private ClassPrinting classPrinting;
 	String schema;
@@ -73,7 +70,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 
 	int totNotifiche = 0;
 	int totErroriNotifiche = 0;
-	
+
 	private Connection connection;
 	//inizio LP PG22XX07
 	NodoSpcDao nodoSpcDao = null;
@@ -85,6 +82,9 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 	
 	String lineSeparator = "============================================================================================";
 
+	//CallableStatement callableStatement;
+	NotificaPagamentiEsterniDAO notificaPagamentiEsterniDAO;  
+	//fine LP 20240826 - PGNTBNPE-1
 	//SVILUPPO_001_LUCAP_28.05.2020
 	private ArrayList<NotificaPagamentiEsterniModel> listErroriNotificaPagamentiEsterni = new ArrayList<NotificaPagamentiEsterniModel>();
 	private HashMap<String, String> listErrori = new HashMap<String, String>();
@@ -125,8 +125,6 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		return notificaPagamentiEsterniResponse;
 	}
 
-
-
 	private void postProcess(ClassPrinting classPrinting) {
 		printRow(myPrintingKeyPAG_SYSOUT, " ");
 		printRow(myPrintingKeyPAG_SYSOUT, "Notifica pagamenti esterni completata - Numero di notifiche: " + totNotifiche);
@@ -147,7 +145,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		w.append(System.getProperties().get("java.version") + "\n");  
 		//inizio LP PG22XX07
 		//w.append("(C) Copyright 2017 di e-SED"  + "\n");
-		w.append("(C) Copyright 2021 di Maggioli spa"  + "\n");
+		w.append("(C) Copyright 2024 Maggioli Spa"  + "\n");
 		//inizio LP PG22XX07
 		w.append("\n");
 		System.out.println(w.toString());
@@ -163,27 +161,12 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 
 		String fileConf = notificaPagamentiEsterniContext.getParameter("CONFIGPATH");
 		
-//		try {
-//			config = PropertiesLoader.load(fileConf);
 		configTree = new PropertiesTree(fileConf);
 		if( configTree == null) {
 			printRow(myPrintingKeyPAG_SYSOUT, "Errore settaggio da file di configurazione " + fileConf );
 			throw new Exception();
 		}
-//		} catch (FileNotFoundException e) {
-//			printRow(myPrintingKeyPAG_SYSOUT, "File di configurazione " + fileConf + " non trovato");
-//			throw new Exception();
-//		} catch (IOException e) {
-//			printRow(myPrintingKeyPAG_SYSOUT, "Errore file di configurazione " + fileConf + " " + e);
-//			throw new Exception();
-//		}	
 		notificaPagamentiEsterniContext.setConfig(configTree);
-		
-//		if (notificaPagamentiEsterniContext.getUrlWsEsterno(notificaPagamentiEsterniContext.getCodiceUtente())==null) {
-//			printRow(myPrintingKeyPAG_SYSOUT, "Url WS Esterno non configurata"); 
-//			throw new Exception();
-//		}
-
 		
 		if (notificaPagamentiEsterniContext.getDatasourceJDBCDriver(notificaPagamentiEsterniContext.getCodiceUtente())==null) {
 			printRow(myPrintingKeyPAG_SYSOUT, "JDBCDriver non configurato"); 
@@ -239,9 +222,10 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			dsProperties.put(DAOHelper.JDBC_USER, notificaPagamentiEsterniContext.getDatasourceJDBCUser(notificaPagamentiEsterniContext.getCodiceUtente()));
 			dsProperties.put(DAOHelper.JDBC_PASSWORD, notificaPagamentiEsterniContext.getDatasourceJDBCPassword(notificaPagamentiEsterniContext.getCodiceUtente()));
 			//inizio LP PG200060
-			if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+			//if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+			if(((String) dsProperties.get(DAOHelper.JDBC_DRIVER)).toUpperCase().indexOf("mysql") != -1) { 
 			//fine LP PG200060
-			dsProperties.put("autocommit", "true");		//TODO da verificare
+				dsProperties.put("autocommit", "true");		//TODO da verificare
 			//inizio LP PG200060
 			}
 			//fine LP PG200060
@@ -253,21 +237,12 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			this.schema = notificaPagamentiEsterniContext.getDatasourceSchema(notificaPagamentiEsterniContext.getCodiceUtente());
 		}		
 
-//		ConfigPagamentoSingleRequest configPagamentoSingleRequest = new ConfigPagamentoSingleRequest(notificaPagamentiEsterniContext.getCodiceSocieta(notificaPagamentiEsterniContext.getCodiceUtente()),
-//				notificaPagamentiEsterniContext.getCodiceUtente(), notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()),
-//				"SAN", "WEB");
-//		ConfigPagamentoSingleResponse  configPagamentoSingleResponse = recuperaFunzioneEnte(configPagamentoSingleRequest );
-//		if(configPagamentoSingleResponse.getConfigPagamento().getFlagNotificaPagamento().equalsIgnoreCase("Y")) {
-//			String integraente_endpointurl = configPagamentoSingleResponse.getConfigPagamento().getUrlServizioWebNotificaPagamento();
-//		}
-//				
-				
 		printRow(myPrintingKeyPAG_SYSOUT, "Configurazione caricata da " + fileConf);
 		connection = this.datasource.getConnection();
 		//inizio LP PG200060
 		if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
 		//fine LP PG200060
-		connection.setAutoCommit(true);
+			connection.setAutoCommit(true);
 		//inizio LP PG200060
 		}
 		//fine LP PG200060
@@ -349,31 +324,33 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		
 		try {
 			printRow(myPrintingKeyPAG_SYSOUT, "Estrazione Pagamenti Esterni non notificate ");
-			CallableStatement callableStatement;
-			
+			//inizio LP 20240826 - PGNTBNPE-1
+			//CallableStatement callableStatement;
+			ResultSet listNotificaPagamenti = null;
+			if(notificaPagamentiEsterniDAO == null) {
+				notificaPagamentiEsterniDAO = new NotificaPagamentiEsterniDAO(connection, schema);
+			}
+			//fine LP 20240826 - PGNTBNPE-1
 			try {
-				callableStatement = Helper.prepareCall(connection, schema, "PYNEXSP_LST_BATCH");
-				callableStatement.setString(1, notificaPagamentiEsterniContext.getCodiceSocieta(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_CSOCCSOC CHAR(5),
-				callableStatement.setString(2, notificaPagamentiEsterniContext.getCodiceUtente());//				IN I_NEX_CUTECUTE CHAR(5),
-				callableStatement.setString(3, notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_KANEKENT CHAR(10),
-				callableStatement.setString(4, "");//				IN I_NEX_KTRAKTRA VARCHAR(64),
-				callableStatement.setString(5, "");//				IN I_NEX_KTDTKTDT VARCHAR(64), --PG180110 FB
-				callableStatement.setInt(6, notificaPagamentiEsterniContext.getMaxTentativi(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_NNEXCORR_MAX INTEGER,
-				callableStatement.setString(7, ""); //notificaPagamentiEsterniContext.getUrlWsEsterno(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_CNEXPORT VARCHAR(256),
-				callableStatement.setString(8, "");//				IN I_NEX_CNEXNDOC VARCHAR(20),
-				callableStatement.setString(9, "");//				IN I_NEX_CNEXNAVV VARCHAR(18),
-				callableStatement.setString(10, "");//				IN I_NEX_CNEXCFIS VARCHAR(64)	
-				
-				
-				callableStatement.execute();
-				
-				
+//inizio LP 20240826 - PGNTBNPE-1
+//				callableStatement = Helper.prepareCall(connection, schema, "PYNEXSP_LST_BATCH");
+//				callableStatement.setString(1, notificaPagamentiEsterniContext.getCodiceSocieta(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_CSOCCSOC CHAR(5),
+//				callableStatement.setString(2, notificaPagamentiEsterniContext.getCodiceUtente());//				IN I_NEX_CUTECUTE CHAR(5),
+//				callableStatement.setString(3, notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_KANEKENT CHAR(10),
+//				callableStatement.setString(4, "");//				IN I_NEX_KTRAKTRA VARCHAR(64),
+//				callableStatement.setString(5, "");//				IN I_NEX_KTDTKTDT VARCHAR(64), --PG180110 FB
+//				callableStatement.setInt(6, notificaPagamentiEsterniContext.getMaxTentativi(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_NNEXCORR_MAX INTEGER,
+//				callableStatement.setString(7, ""); //notificaPagamentiEsterniContext.getUrlWsEsterno(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_CNEXPORT VARCHAR(256),
+//				callableStatement.setString(8, "");//				IN I_NEX_CNEXNDOC VARCHAR(20),
+//				callableStatement.setString(9, "");//				IN I_NEX_CNEXNAVV VARCHAR(18),
+//				callableStatement.setString(10, "");//				IN I_NEX_CNEXCFIS VARCHAR(64)	
+//				callableStatement.execute();
+				listNotificaPagamenti = notificaPagamentiEsterniDAO.listNotificaPagamentiEsterni(notificaPagamentiEsterniContext);
+//fine LP 20240826 - PGNTBNPE-1
 				printRow(myPrintingKeyPAG_SYSOUT, "Estrazione Pagamenti Esterni non notificate eseguita con PYNEXSP_LST_BATCH e con i parametri:");
 				printRow(myPrintingKeyPAG_SYSOUT, "getCodiceSocieta = " + notificaPagamentiEsterniContext.getCodiceSocieta(notificaPagamentiEsterniContext.getCodiceUtente()));
 				printRow(myPrintingKeyPAG_SYSOUT, "getCodiceUtente = " + notificaPagamentiEsterniContext.getCodiceUtente());
 				printRow(myPrintingKeyPAG_SYSOUT, "getCodiceEnte = " + notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()));
-				
-				
 			}  catch (Exception e){
 				e.printStackTrace();
 				throw e;
@@ -382,7 +359,9 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			
 			//System.out.println("Post estrazione pagamenti esterni - " + new java.util.Date(System.currentTimeMillis()));
 			//System.out.println("Pre elaborazione resultset pagamenti estratti - " + new java.util.Date(System.currentTimeMillis()));
-			ResultSet listNotificaPagamenti = callableStatement.getResultSet();
+			//inizio LP 20240826 - PGNTBNPE-1
+			//ResultSet listNotificaPagamenti = callableStatement.getResultSet();
+			//fine LP 20240826 - PGNTBNPE-1
 			
 			if (listNotificaPagamenti.next()){
 				do{
@@ -449,7 +428,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 				} while(listNotificaPagamenti.next());
 			}
 			
-			if (listNotificaPagamenti!=null){
+			if (listNotificaPagamenti != null){
 				listNotificaPagamenti.close();
 				listNotificaPagamenti = null;
 			}
@@ -459,7 +438,6 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			com.seda.payer.integraente.webservice.dati.NotificaPagamentoResponse response = null;
 			com.seda.payer.integraente.webservice.dati.NotificaRevocaPagamentoResponse responseRevoca = null;
 			//fine LP PG190220
-			
 			//Per ogni Notifica Pagamento estratta re-interrogo WS Esterno di Notifica
 			for (int i = 0; i < listNotificaPagamentiEsterniEstratti.size(); i++) {
 				String transazioneCorrente = "";
@@ -471,7 +449,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 					transazioneCorrente = model.getChiaveTransazione();
 					//inizio LP PG190220
 					bFaiNotifica = model.DaEseguireNotifica();
-					
+
 					if(bFaiNotifica) {
 						//fine LP PG190220
 						printRow(myPrintingKeyPAG_SYSOUT, sdf.format(new java.util.Date(System.currentTimeMillis())) + " - " + "Rinotifica Pagamento esterno per Codice Fiscale: " + model.getCodiceFiscale() + " - Numero Avviso Pagamento: " + model.getNumeroAvviso() + " - Transazione: " + model.getChiaveTransazione());
@@ -481,21 +459,16 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 					}
 					//fine LP PG190220
 					printRow(myPrintingKeyPAG_SYSOUT, "Portale esterno: " + model.getUrlPortale());	
-					
-					
+
 					printRow(myPrintingKeyPAG_SYSOUT, "recuperaTransazione: " + model.getChiaveTransazione());	
 					printRow(myPrintingKeyPAG_SYSOUT, "DettaglioTransazione: " + model.getChiaveDettaglioTransazione());
-				
+
 					RecuperaTransazioneResponseType res = recuperaTransazione(model.getChiaveTransazione());
 					BeanIV[] listIV = res.getListIV();
-					
 
-					
 					for (BeanIV beanIV : listIV) {
-				       
 						// devo inviare la notifica solamente al bollettino che sto ciclando sulla tabella NEX
-						if(model.getChiaveDettaglioTransazione().equals(beanIV.getChiave_transazione_dettaglio()))
-						{ 
+						if(model.getChiaveDettaglioTransazione().equals(beanIV.getChiave_transazione_dettaglio())) { 
 							System.err.println("beanIV.getChiave_transazione_dettaglio() = "+ beanIV.getChiave_transazione_dettaglio());
 							String numeroAvvisoPagoPA = "";
 							PagamentoSpontaneo pagamentoSpontaneo = null;
@@ -507,10 +480,9 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 								//Blindatura su codice bollettino valorizzato erroneamente
 								if(beanIV.getTipo_bollettino().equals("CDSA") && beanIV.getCodice_bollettino_premarcato_mav() != null && beanIV.getCodice_bollettino_premarcato_mav().length() < 15)
 									beanIV.setCodice_bollettino_premarcato_mav("");
-								
+
 								printRow(myPrintingKeyPAG_SYSOUT, "Trovato bollettino SPONTANEO o MULTA SENZA AVVISO: ");	
-								
-								
+
 								//notificaPagamentoRequest.setPagamentoSpontaneo(pagamentoSpontaneo);
 								pagamentoSpontaneo = new PagamentoSpontaneo();
 								String denominazione = beanIV.getDenominazione();
@@ -518,7 +490,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 				                String codiceBelfioreComune = beanIV.getCodice_ente_comune_domicilio_fiscale();
 				                String siglaProvincia = beanIV.getProvincia();
 				                String CAP = beanIV.getCap();
-				                
+
 				                pagamentoSpontaneo.setDenominazione(denominazione);
 				                pagamentoSpontaneo.setIndirizzo(indirizzo);
 				                if(!codiceBelfioreComune.trim().equals("")) {
@@ -542,8 +514,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 									String numeroVerbale = beanIV.getCodice_bollettino_premarcato_mav(); // len 15
 									String targa = beanIV.getTarga(); // len 10
 									SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-									
-									
+
 									//Calendar dataVerbale = beanIV.getData_sanzione(); // len 14
 									TipoCDS tipoCDS = new TipoCDS(numeroVerbale, sdf.format(beanIV.getData_sanzione().getTime()), targa);
 									pagamentoSpontaneo.setTipoCDS(tipoCDS);
@@ -563,31 +534,27 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 								  printRow(myPrintingKeyPAG_SYSOUT, "inizio Spontaneo");
 								  //transazioniIV.setNote_premarcato(boll.getCausaleservizio() + "|" + boll.getAnnorif() + "|" + boll.getCespite());
 								  String note = beanIV.getNote_premarcato();
-								  
+
 								  System.out.println("note = " + note);
 								  //String cosa = "\\|";
-								  
+
 								  String annoRiferimento = "";
 								  String cespite ="";
-								  
+
 								  String cosa = "\\|";
 								  String[] notesplit = note.split(cosa);
 
 								  String causaleServizio = notesplit[0]; //len 256
-								  
+
 								  if(notesplit.length>1)
 									  annoRiferimento = notesplit[1]; // len 4
 								  if(notesplit.length>2)
 									  cespite = notesplit[2]; //len 256
-								  
-							     
-							      
+
 							      printRow(myPrintingKeyPAG_SYSOUT, "annoRiferimento = " + annoRiferimento);
 							      printRow(myPrintingKeyPAG_SYSOUT, "causaleServizio = " + causaleServizio);
 							      printRow(myPrintingKeyPAG_SYSOUT, "cespite = " + cespite);
-							      
-							      
-							      
+
 								  TipoSpontaneo tipoSpontaneo = new TipoSpontaneo();
 								  if(!annoRiferimento.trim().equals("")) {
 									  tipoSpontaneo.setAnnoRiferimento(annoRiferimento.trim());
@@ -599,13 +566,10 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 									  tipoSpontaneo.setCespite(cespite.trim());
 								  }
 								  pagamentoSpontaneo.setTipoSpontaneo(tipoSpontaneo);
-		
 								}
-							}else {
+							} else {
 								numeroAvvisoPagoPA = beanIV.getCodice_bollettino_premarcato_mav();
 							}
-							
-							
 							//inizio LP PG190220
 							if(!bFaiNotifica) {
 								printRow(myPrintingKeyPAG_SYSOUT, "inizio Notifica WS");
@@ -617,7 +581,7 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 								notificaRevocaPagamentoRequest.setCodiceEnte(model.getChiaveEnte().trim());
 								notificaRevocaPagamentoRequest.setCodiceFiscale(model.getCodiceFiscale());
 								notificaRevocaPagamentoRequest.setNumeroDocumento(model.getNumeroDocumento());
-								
+
 								notificaRevocaPagamentoRequest.setImportoPagato(model.getImportoPagato().longValue());
 								SimpleDateFormat sdf1 = new SimpleDateFormat("yyyyMMddHHmmss");
 								notificaRevocaPagamentoRequest.setDataPagamento(sdf1.format(model.getDataPagamento().getTime()));
@@ -625,145 +589,125 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 									notificaRevocaPagamentoRequest.setPagamentoSpontaneo(pagamentoSpontaneo);
 								else
 									notificaRevocaPagamentoRequest.setNumeroAvvisoPagoPA(numeroAvvisoPagoPA);
-									
+
 								notificaRevocaPagamentoRequest.setRtXML(model.getXmlRicevuta());
 								notificaRevocaPagamentoRequest.setRrXML(model.getXmlRichiestaRevoca());
-								
+
 								System.out.println("notificaRevocaPagamentoRequest.getCodiceDettaglioTransazionePagonet = " + notificaRevocaPagamentoRequest.getCodiceDettaglioTransazionePagonet());
-								
+
 								// metodo integraente
 								responseRevoca = serviceIntegraEnteNotifica.notificaRevocaPagamento(notificaRevocaPagamentoRequest);
 								//fine LP PG190220
-								
+
 								printRow(myPrintingKeyPAG_SYSOUT, "Notifica revoca pagamento esterno eseguita con esito: " + responseRevoca.getRisultato().getRetcode().getValue());	
-								
+
 								pagamentoSpontaneo = null;
 								notificaRevocaPagamentoRequest = null;
 								serviceIntegraEnteNotifica = null;
 							} else {
-							//fine LP PG190220
-							//Preparo chiamata a WS Esterno (Sanità)
-							com.seda.payer.integraente.webservice.source.IntegraEnteSanitaSOAPBindingStub serviceIntegraEnteSanita = new com.seda.payer.integraente.webservice.source.IntegraEnteSanitaSOAPBindingStub(new java.net.URL(model.getUrlPortale()), null);
-							com.seda.payer.integraente.webservice.dati.NotificaPagamentoRequest notificaPagamentoRequest = new com.seda.payer.integraente.webservice.dati.NotificaPagamentoRequest();
-							notificaPagamentoRequest.setCodiceTransazionePagonet(model.getChiaveTransazione());
-							notificaPagamentoRequest.setCodiceDettaglioTransazionePagonet(beanIV.getChiave_transazione_dettaglio());//In update non serve aggiornare questo campo
-							notificaPagamentoRequest.setCodiceEnte(model.getChiaveEnte().trim());
-							notificaPagamentoRequest.setCodiceFiscale(model.getCodiceFiscale());
-							notificaPagamentoRequest.setNumeroDocumento(model.getNumeroDocumento());
-							
-							notificaPagamentoRequest.setImportoPagato(model.getImportoPagato().longValue());
-							SimpleDateFormat sdf1 = new SimpleDateFormat("yyyyMMddHHmmss");
-							notificaPagamentoRequest.setDataPagamento(sdf1.format(model.getDataPagamento().getTime()));
-							if(pagamentoSpontaneo!=null)
-								notificaPagamentoRequest.setPagamentoSpontaneo(pagamentoSpontaneo);				
-							
-							else
-								notificaPagamentoRequest.setNumeroAvvisoPagoPA(numeroAvvisoPagoPA);
-							
-							if(!model.getUrlPortale().toLowerCase().contains("integraentesanita")) {
-							  notificaPagamentoRequest.setIdentificativoUnivocoRiscossione(beanIV.getCodiceIUR());
-							  notificaPagamentoRequest.setTassonomia(beanIV.getTassonomia());  
-							  notificaPagamentoRequest.setIdentificativoUnivocoVersamento(beanIV.getNodoSpcIuv());
-							}
-							
-							//PG22XX09_SB3 - inizio
-							if(model.getUrlPortale().contains("jcitygov-pagopa")) {
-								notificaPagamentoRequest.setIuvRpt(beanIV.getNodoSpcIuv());
-							}
-							//PG22XX09_SB3 - fine
-							
-							//inizio LP PG22XX07 - Bug RT non conformi per AGID
-							//notificaPagamentoRequest.setRtXML(model.getXmlRicevuta());
-							//forzatura UTF-8
-							//notificaPagamentoRequest.setRtXML(new String(model.getXmlRicevuta().getBytes("UTF-8"), "UTF-8"));
-							String RTXML = new String(model.getXmlRicevuta().getBytes("UTF-8"), "UTF-8");
-							if(RTXML.indexOf("generate=\"PAGONET\"") != -1) {
-								String iuv = beanIV.getNodoSpcIuv();
-//								//Se auxdigit != 0  ==> iuv e' senza auxdigit di lunghezza 17
-//					    		String iuv = numeroAvviso.substring(1);
-//								//Se auxdigit == 0 ==> iuv e' senza applicationcode quindi di lungohezza 15
-//					    		if(numeroAvviso.substring(0, 1).equals("0"))
-//					    			iuv = iuv.substring(2);
-								String tassonomia = beanIV.getTassonomia();
-								System.out.println("inzio conversione RT con generate=\"PAGONET\"");
-								RTXML = generateRT(model.getChiaveTransazione(), iuv, tassonomia, RTXML);
-								if(bAggiornaRTErrate)
-									model.setXmlRicevuta(RTXML);
-							}
-							notificaPagamentoRequest.setRtXML(RTXML);
-							System.out.println("RT presente in DB e letta in java = " + notificaPagamentoRequest.getRtXML());
-							//System.out.println("notificaPagamentoRequest.getRtXML() = " + notificaPagamentoRequest.getRtXML());
-							
-							//07102022 SB - inizio
-							if(!model.getUrlPortale().toLowerCase().contains("integraentesanita")) {
-								notificaPagamentoRequest.setIdentificativoUnivocoVersamento(beanIV.getNodoSpcIuv());
-								notificaPagamentoRequest.setIdentificativoUnivocoRiscossione(beanIV.getCodiceIUR());
-								notificaPagamentoRequest.setTassonomia(beanIV.getTassonomia());
-							}
-							//07102022 SB - fine
-							
-							System.out.println("notificaPagamentoRequest.getCodiceDettaglioTransazionePagonet = " + notificaPagamentoRequest.getCodiceDettaglioTransazionePagonet());
-
-							//ini YLM PG22XX05_26 
-				    		java.util.Date dataInizio = new java.util.Date();
-				            Timestamp dIni = new Timestamp(dataInizio.getTime());
-				            
-				    		LogWin notificaLog = new LogWin();
-				            String esitoLog = "";
-				            String errorMessageLog = "";
-				            String xmlInputLog = "";
-				            String xmlOutputLog = "";
-				            //fine YLM PG22XX05_26 
-				            
-				            
-					        try {
-					        	
-					        	// inizio LM PAGONET-396
-					        	xmlInputLog = getStringXMLofObject(notificaPagamentoRequest) != null ? getStringXMLofObject(notificaPagamentoRequest) :  "getStringXMLofObject(notificaPagamentoRequest) vuota";
-					        	// fine LM PAGONET-396
-					        	
-								// metodo integraente
-								//inizio LP PG190220
-								//com.seda.payer.integraente.webservice.dati.NotificaPagamentoResponse response = serviceIntegraEnteSanita.notificaPagamento(notificaPagamentoRequest);
-								response = serviceIntegraEnteSanita.notificaPagamento(notificaPagamentoRequest);
 								//fine LP PG190220
+								//Preparo chiamata a WS Esterno (Sanità)
+								com.seda.payer.integraente.webservice.source.IntegraEnteSanitaSOAPBindingStub serviceIntegraEnteSanita = new com.seda.payer.integraente.webservice.source.IntegraEnteSanitaSOAPBindingStub(new java.net.URL(model.getUrlPortale()), null);
+								com.seda.payer.integraente.webservice.dati.NotificaPagamentoRequest notificaPagamentoRequest = new com.seda.payer.integraente.webservice.dati.NotificaPagamentoRequest();
+								notificaPagamentoRequest.setCodiceTransazionePagonet(model.getChiaveTransazione());
+								notificaPagamentoRequest.setCodiceDettaglioTransazionePagonet(beanIV.getChiave_transazione_dettaglio());//In update non serve aggiornare questo campo
+								notificaPagamentoRequest.setCodiceEnte(model.getChiaveEnte().trim());
+								notificaPagamentoRequest.setCodiceFiscale(model.getCodiceFiscale());
+								notificaPagamentoRequest.setNumeroDocumento(model.getNumeroDocumento());
+	
+								notificaPagamentoRequest.setImportoPagato(model.getImportoPagato().longValue());
+								SimpleDateFormat sdf1 = new SimpleDateFormat("yyyyMMddHHmmss");
+								notificaPagamentoRequest.setDataPagamento(sdf1.format(model.getDataPagamento().getTime()));
+								if(pagamentoSpontaneo != null)
+									notificaPagamentoRequest.setPagamentoSpontaneo(pagamentoSpontaneo);				
+								else
+									notificaPagamentoRequest.setNumeroAvvisoPagoPA(numeroAvvisoPagoPA);
 								
+								if(!model.getUrlPortale().toLowerCase().contains("integraentesanita")) {
+								  notificaPagamentoRequest.setIdentificativoUnivocoRiscossione(beanIV.getCodiceIUR());
+								  notificaPagamentoRequest.setTassonomia(beanIV.getTassonomia());  
+								  notificaPagamentoRequest.setIdentificativoUnivocoVersamento(beanIV.getNodoSpcIuv());
+								}
+	
+								//PG22XX09_SB3 - inizio
+								if(model.getUrlPortale().contains("jcitygov-pagopa")) {
+									notificaPagamentoRequest.setIuvRpt(beanIV.getNodoSpcIuv());
+								}
+								//PG22XX09_SB3 - fine
+	
+								//inizio LP PG22XX07 - Bug RT non conformi per AGID
+								//notificaPagamentoRequest.setRtXML(model.getXmlRicevuta());
+								//forzatura UTF-8
+								//notificaPagamentoRequest.setRtXML(new String(model.getXmlRicevuta().getBytes("UTF-8"), "UTF-8"));
+								String RTXML = new String(model.getXmlRicevuta().getBytes("UTF-8"), "UTF-8");
+								if(RTXML.indexOf("generate=\"PAGONET\"") != -1) {
+									String iuv = beanIV.getNodoSpcIuv();
+	//								//Se auxdigit != 0  ==> iuv e' senza auxdigit di lunghezza 17
+	//					    		String iuv = numeroAvviso.substring(1);
+	//								//Se auxdigit == 0 ==> iuv e' senza applicationcode quindi di lungohezza 15
+	//					    		if(numeroAvviso.substring(0, 1).equals("0"))
+	//					    			iuv = iuv.substring(2);
+									String tassonomia = beanIV.getTassonomia();
+									System.out.println("inzio conversione RT con generate=\"PAGONET\"");
+									RTXML = generateRT(model.getChiaveTransazione(), iuv, tassonomia, RTXML);
+									if(bAggiornaRTErrate)
+										model.setXmlRicevuta(RTXML);
+								}
+								notificaPagamentoRequest.setRtXML(RTXML);
+								System.out.println("RT presente in DB e letta in java = " + notificaPagamentoRequest.getRtXML());
+								//System.out.println("notificaPagamentoRequest.getRtXML() = " + notificaPagamentoRequest.getRtXML());
+								//07102022 SB - inizio
+								if(!model.getUrlPortale().toLowerCase().contains("integraentesanita")) {
+									notificaPagamentoRequest.setIdentificativoUnivocoVersamento(beanIV.getNodoSpcIuv());
+									notificaPagamentoRequest.setIdentificativoUnivocoRiscossione(beanIV.getCodiceIUR());
+									notificaPagamentoRequest.setTassonomia(beanIV.getTassonomia());
+								}
+								//07102022 SB - fine
+								System.out.println("notificaPagamentoRequest.getCodiceDettaglioTransazionePagonet = " + notificaPagamentoRequest.getCodiceDettaglioTransazionePagonet());
 								//ini YLM PG22XX05_26 
-								esitoLog = response.getRisultato().getRetcode().getValue() + " : " + response.getRisultato().getRetmessage().toString(); 
-								
-						        //fine YLM PG22XX05_26 
-					    		
-								printRow(myPrintingKeyPAG_SYSOUT, "Notifica pagamento esterno eseguita con esito: " + response.getRisultato().getRetcode().getValue());	
-								
-								pagamentoSpontaneo = null;
-								notificaPagamentoRequest = null;
-								serviceIntegraEnteSanita = null;
-							
-							} catch (Exception e) {
-								esitoLog= "KO : Exception";
-								errorMessageLog = e.getMessage();
-							} finally {
-
-								//ini YLM PG22XX05_26 
-								xmlOutputLog = response != null && getStringXMLofObject(response) != null ? getStringXMLofObject(response) : "Errore: mancanza xlm output";
-								
-								notificaLog.setDataInizioChiamata(dIni);
-								notificaLog.setTipoChiamata("notificaPagamento");
-								notificaLog.setOperatoreInserimento("notificaPagamentoBatch");
-								notificaLog.setEsito(esitoLog);
-								notificaLog.setMessaggioErrore(errorMessageLog);
-								notificaLog.setXmlRequest(xmlInputLog);
-								notificaLog.setXmlResponse(xmlOutputLog);
-								
-								
-								inizializzaSalvaLoggingWinProcessNotificaPagamenti(response, notificaLog, model.getCodiceUtente());
-						        //fine YLM PG22XX05_26 
-							}
-							
+					    		java.util.Date dataInizio = new java.util.Date();
+					            Timestamp dIni = new Timestamp(dataInizio.getTime());
+					    		LogWin notificaLog = new LogWin();
+					            String esitoLog = "";
+					            String errorMessageLog = "";
+					            String xmlInputLog = "";
+					            String xmlOutputLog = "";
+					            //fine YLM PG22XX05_26 
+						        try {
+						        	// inizio LM PAGONET-396
+						        	xmlInputLog = getStringXMLofObject(notificaPagamentoRequest) != null ? getStringXMLofObject(notificaPagamentoRequest) :  "getStringXMLofObject(notificaPagamentoRequest) vuota";
+						        	// fine LM PAGONET-396
+									// metodo integraente
+									//inizio LP PG190220
+									//com.seda.payer.integraente.webservice.dati.NotificaPagamentoResponse response = serviceIntegraEnteSanita.notificaPagamento(notificaPagamentoRequest);
+									response = serviceIntegraEnteSanita.notificaPagamento(notificaPagamentoRequest);
+									//fine LP PG190220
+									//ini YLM PG22XX05_26 
+									esitoLog = response.getRisultato().getRetcode().getValue() + " : " + response.getRisultato().getRetmessage().toString(); 
+							        //fine YLM PG22XX05_26 
+									printRow(myPrintingKeyPAG_SYSOUT, "Notifica pagamento esterno eseguita con esito: " + response.getRisultato().getRetcode().getValue());	
+									pagamentoSpontaneo = null;
+									notificaPagamentoRequest = null;
+									serviceIntegraEnteSanita = null;
+								} catch (Exception e) {
+									esitoLog= "KO : Exception";
+									errorMessageLog = e.getMessage();
+								} finally {
+									//ini YLM PG22XX05_26 
+									xmlOutputLog = response != null && getStringXMLofObject(response) != null ? getStringXMLofObject(response) : "Errore: mancanza xlm output";
+									notificaLog.setDataInizioChiamata(dIni);
+									notificaLog.setTipoChiamata("notificaPagamento");
+									notificaLog.setOperatoreInserimento("notificaPagamentoBatch");
+									notificaLog.setEsito(esitoLog);
+									notificaLog.setMessaggioErrore(errorMessageLog);
+									notificaLog.setXmlRequest(xmlInputLog);
+									notificaLog.setXmlResponse(xmlOutputLog);
+									inizializzaSalvaLoggingWinProcessNotificaPagamenti(response, notificaLog, model.getCodiceUtente());
+							        //fine YLM PG22XX05_26 
+								}
 							//inizio LP PG190220
 							}
 							//fine LP PG190220
-							
 							//Aggiorno tabella delle notifiche
 							try {
 								long calInMillis = Calendar.getInstance().getTimeInMillis();
@@ -791,55 +735,64 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 //						    	21 IN I_NEX_CNEXRRAN" CLOB(1M)
 								//fine LP PG190220    	
 								
-								callableStatement = Helper.prepareCall(connection, schema, "PYNEXSP_UPD");
-								callableStatement.setString(1, model.getChiaveTransazione());
-								callableStatement.setString(2, model.getChiaveDettaglioTransazione());	//PG1800XX_014 GG //TODO
-								callableStatement.setString(3, model.getCodiceSocieta());
-								callableStatement.setString(4, model.getCodiceUtente());
-								callableStatement.setString(5, model.getChiaveEnte());
-								//inizio LP PG190220
-								//callableStatement.setInt(6, 0);//0 => incrementa in automatico di 1
-								if(bFaiNotifica) {
-									callableStatement.setInt(6, 0);//0 => incrementa in automatico di 1
-								} else {
-									callableStatement.setInt(6, model.getNumeroTentativoNotifica());
-								}
-								//fine LP PG190220
-								callableStatement.setString(7, model.getUrlPortale());
-								callableStatement.setString(8, model.getNumeroDocumento());
-								callableStatement.setString(9, numeroAvvisoPagoPA);
-								callableStatement.setString(10, model.getCodiceFiscale());
-								callableStatement.setNull(11, java.sql.Types.TIMESTAMP);
-								//callableStatement.setTimestamp(12, new Timestamp(Calendar.getInstance().getTimeInMillis()));
-								if(bFaiNotifica) {
-									callableStatement.setTimestamp(12, new Timestamp(calInMillis));
-									callableStatement.setString(13, response.getRisultato().getRetcode().getValue());
-								} else {
-									callableStatement.setNull(12, java.sql.Types.TIMESTAMP);
-									callableStatement.setNull(13, java.sql.Types.VARCHAR);
-								}
-								callableStatement.setBigDecimal(14, model.getImportoPagato());
-								callableStatement.setTimestamp(15, new Timestamp(model.getDataPagamento().getTimeInMillis()));
-								callableStatement.setString(16, model.getXmlRicevuta());
-								//inizio LP PG190220
-								if(bFaiNotifica) {
-									callableStatement.setInt(17, -1);
-									callableStatement.setNull(18, java.sql.Types.TIMESTAMP);
-									callableStatement.setNull(19, java.sql.Types.TIMESTAMP);
-									callableStatement.setNull(20, java.sql.Types.VARCHAR);
-									callableStatement.setString(21, model.getXmlRichiestaRevoca() != null ?  model.getXmlRichiestaRevoca() : "");
-								} else {
-									callableStatement.setInt(17, 0);//0 => incrementa in automatico di 1
-									if(model.getDataInvioNotificaAnnullo() != null)
-										callableStatement.setTimestamp(18, new Timestamp(model.getDataInvioNotificaAnnullo().getTimeInMillis()));
-									else
-										callableStatement.setTimestamp(18, new Timestamp(calInMillis));
-									callableStatement.setTimestamp(19, new Timestamp(calInMillis));
-									callableStatement.setString(20, responseRevoca.getRisultato().getRetcode().getValue());
-									callableStatement.setString(21, model.getXmlRichiestaRevoca() != null ?  model.getXmlRichiestaRevoca() : "");
-								}
-								//fine LP PG190220
-								callableStatement.execute();
+//inizio LP 20240826 - PGNTBNPE-1
+//								callableStatement = Helper.prepareCall(connection, schema, "PYNEXSP_UPD");
+//								callableStatement.setString(1, model.getChiaveTransazione());
+//								callableStatement.setString(2, model.getChiaveDettaglioTransazione());	//PG1800XX_014 GG
+//								callableStatement.setString(3, model.getCodiceSocieta());
+//								callableStatement.setString(4, model.getCodiceUtente());
+//								callableStatement.setString(5, model.getChiaveEnte());
+//								//inizio LP PG190220
+//								//callableStatement.setInt(6, 0);//0 => incrementa in automatico di 1
+//								if(bFaiNotifica) {
+//									callableStatement.setInt(6, 0);//0 => incrementa in automatico di 1
+//								} else {
+//									callableStatement.setInt(6, model.getNumeroTentativoNotifica());
+//								}
+//								//fine LP PG190220
+//								callableStatement.setString(7, model.getUrlPortale());
+//								callableStatement.setString(8, model.getNumeroDocumento());
+//								callableStatement.setString(9, numeroAvvisoPagoPA);
+//								callableStatement.setString(10, model.getCodiceFiscale());
+//								callableStatement.setNull(11, java.sql.Types.TIMESTAMP);
+//								//callableStatement.setTimestamp(12, new Timestamp(Calendar.getInstance().getTimeInMillis()));
+//								if(bFaiNotifica) {
+//									callableStatement.setTimestamp(12, new Timestamp(calInMillis));
+//									callableStatement.setString(13, response.getRisultato().getRetcode().getValue());
+//								} else {
+//									callableStatement.setNull(12, java.sql.Types.TIMESTAMP);
+//									callableStatement.setNull(13, java.sql.Types.VARCHAR);
+//								}
+//								callableStatement.setBigDecimal(14, model.getImportoPagato());
+//								callableStatement.setTimestamp(15, new Timestamp(model.getDataPagamento().getTimeInMillis()));
+//								callableStatement.setString(16, model.getXmlRicevuta());
+//								//inizio LP PG190220
+//								if(bFaiNotifica) {
+//									callableStatement.setInt(17, -1);
+//									callableStatement.setNull(18, java.sql.Types.TIMESTAMP);
+//									callableStatement.setNull(19, java.sql.Types.TIMESTAMP);
+//									callableStatement.setNull(20, java.sql.Types.VARCHAR);
+//									callableStatement.setString(21, model.getXmlRichiestaRevoca() != null ?  model.getXmlRichiestaRevoca() : "");
+//								} else {
+//									callableStatement.setInt(17, 0);//0 => incrementa in automatico di 1
+//									if(model.getDataInvioNotificaAnnullo() != null)
+//										callableStatement.setTimestamp(18, new Timestamp(model.getDataInvioNotificaAnnullo().getTimeInMillis()));
+//									else
+//										callableStatement.setTimestamp(18, new Timestamp(calInMillis));
+//									callableStatement.setTimestamp(19, new Timestamp(calInMillis));
+//									callableStatement.setString(20, responseRevoca.getRisultato().getRetcode().getValue());
+//									callableStatement.setString(21, model.getXmlRichiestaRevoca() != null ?  model.getXmlRichiestaRevoca() : "");
+//								}
+//								//fine LP PG190220
+//								callableStatement.execute();
+								notificaPagamentiEsterniDAO.updateNotificaPagamentiEsterni(
+										model,
+										numeroAvvisoPagoPA,
+										calInMillis,
+										response.getRisultato().getRetcode().getValue(),
+										responseRevoca.getRisultato().getRetcode().getValue(),
+										bFaiNotifica);
+//fine LP 20240826 - PGNTBNPE-1
 								printRow(myPrintingKeyPAG_SYSOUT, "Elaborazione completata con successo");	
 		
 							}  catch (Exception e){
@@ -866,28 +819,30 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			printRow(myPrintingKeyPAG_SYSOUT, "Elaborazione completata con errori");
 			throw new Exception(e.getMessage());
 		} finally {
+			//inizio LP 20240826 - PGNTBNPE-1
+			if(notificaPagamentiEsterniDAO != null) {
+				notificaPagamentiEsterniDAO.destroy();
+			}
+			//fine LP 20240826 - PGNTBNPE-1
 			connection.commit();
 			//inizio LP PG200060
 			if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
 			//fine LP PG200060
-			connection.setAutoCommit(true);
+				connection.setAutoCommit(true);
 			//inizio LP PG200060
 			}
 			//fine LP PG200060
 			connection.close();
 			//connectionHost.close();
-			
 			//SVILUPPO_001_LUCAP_28.05.2020
-			if(listErroriNotificaPagamentiEsterni.size()>0 
-					&& notificaPagamentiEsterniContext.getEmailTo(notificaPagamentiEsterniContext.getCodiceUtente())!=null
-					&& notificaPagamentiEsterniContext.getUrlMailSender(notificaPagamentiEsterniContext.getCodiceUtente())!=null) {
+			if(listErroriNotificaPagamentiEsterni.size() > 0 
+					&& notificaPagamentiEsterniContext.getEmailTo(notificaPagamentiEsterniContext.getCodiceUtente()) != null
+					&& notificaPagamentiEsterniContext.getUrlMailSender(notificaPagamentiEsterniContext.getCodiceUtente()) != null) {
 				segnalaErroriViaMail();
 			}
 			//FINE SVILUPPO_001_LUCAP_28.05.2020
-			
 		}
 	}
-
 
 	private RecuperaTransazioneResponseType recuperaTransazione(String chiaveTransazione) throws Exception {
     	RecuperaTransazioneResponseType sRes = null;
@@ -1005,10 +960,10 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 	
 	// inizio YML PG22XX04_02
 	public void inizializzaSalvaLoggingWinProcessNotificaPagamenti( Object res, LogWin notificaLog , String modelCodUtente)  {
-
-		CallableStatement callableStatement;
+		//inizio LP 20240826 - PGNTBNPE-1
+		//CallableStatement callableStatement;
+		//fine LP 20240826 - PGNTBNPE-1
 		ResultSet data = null;
-		
 		String codiceFiscale = "";
 		String cutecute = "";
 		String codiceEnte = "";
@@ -1016,27 +971,25 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		String codiceSocieta = "";
 
 		try {
-			
+			//inizio LP 20240826 - PGNTBNPE-1
+			//CallableStatement callableStatement;
+			if(notificaPagamentiEsterniDAO == null) {
+				notificaPagamentiEsterniDAO = new NotificaPagamentiEsterniDAO(connection, schema);
+			}
+			//fine LP 20240826 - PGNTBNPE-1
 			java.util.Date dataFine = new java.util.Date();
 			Timestamp dFin = new Timestamp(dataFine.getTime());
-			
 			if (res != null ) {
 				Method[] methods = res.getClass().getMethods();
-				
 				for (int i = 0; i < methods.length; i++) { 
 					Method m = methods[i];
-	//				printRow(myPrintingKeyPAG_SYSOUT, "METODO: " + m.getName());
-					
 					if (m.getName() == "getCodiceSocieta" || m.getName() == "getCodice_societa") {
-						
 						Object c = m.invoke(res);
 						codiceSocieta = c.toString().trim().length()>0 && c.toString() != null
 								? c.toString().trim() 
 								: "";
 					}
-	
 					if (m.getName() == "getCodiceUtente" || m.getName() == "getCodice_utente") {
-						
 						Object c = m.invoke(res);
 						cutecute =  c.toString().trim().length()>5 
 								? c.toString().trim().substring(0, 5) 
@@ -1044,53 +997,46 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 					}
 	//				attenzione chiave a 5 cifre necessaria questo è il codice pubblico
 					if (m.getName() == "getCodiceEnte" || m.getName() == "getChiave_ente_ent") {
-						
 						Object c = m.invoke(res);
 						codiceEnte =  c.toString().trim().length()>0 && c.toString() != null
 								? c.toString().trim()
 								: "";
 					}
 					if (m.getName() == "getCodiceFiscale" || m.getName() == "getCodice_fiscale") {
-						
 						Object c = m.invoke(res);
 						codiceFiscale =  c.toString().trim().length()>0 && c.toString() != null
 								? c.toString().trim() 
 								: "";
 					}
 					if (m.getName() == "getIdentificativoBollettino" || m.getName() == "getCodice_bollettino_premarcato_mav") {
-						
 						Object c = m.invoke(res);
 						numeroBollettino =  c.toString().trim().length()>0 && c.toString() != null
 								? c.toString().trim() 
 								: "";
 					}
-				
-				
 				}
 			} else {
 				cutecute = modelCodUtente;
 			}
-		
-			
-			if ( codiceEnte != null && codiceEnte != "" && codiceEnte.length() == 10) {
 
-				callableStatement = Helper.prepareCall(connection, schema, "PYANESP_SEL");
-				callableStatement.setString(1, codiceEnte);
-				
-				if (callableStatement.execute()) {
-				    data = callableStatement.getResultSet();
-				    if (data.next())
-				    	codiceEnte =  data.getString("ANE_CANECENT");
-				}
-				
-				
+			if (codiceEnte != null && codiceEnte != "" && codiceEnte.length() == 10) {
+				//inizio LP 20240826 - PGNTBNPE-1
+				//callableStatement = Helper.prepareCall(connection, schema, "PYANESP_SEL");
+				//callableStatement.setString(1, codiceEnte);
+				//
+				//if (callableStatement.execute()) {
+				//   data = callableStatement.getResultSet();
+				//   if (data.next())
+				//   	codiceEnte =  data.getString("ANE_CANECENT");
+				//}
+				codiceEnte = notificaPagamentiEsterniDAO.selAnagraficaEnti(codiceEnte);
+				//fine LP 20240826 - PGNTBNPE-1
 			} else {
 				// altrimenti controllo i parametri opzionali della req
-				if ( notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()) != null ) {
+				if (notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()) != null ) {
 					codiceEnte = notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente());
 				}
 			}
-			
 			
 			LogWin logWin = new LogWin();
 			logWin.setTipoChiamata(notificaLog.getTipoChiamata());
@@ -1112,21 +1058,16 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			LoggerUtil winLogger = new LoggerUtil();
 			winLogger.saveWinLog(logWin, configTree);
 		    
-		}  
-		catch (Exception e) {
-		    
+		} catch (Exception e) {
 		    e.printStackTrace();
 		    printRow(myPrintingKeyPAG_SYSOUT, "Errore in saveWinLog: " + e.getMessage());	
-		}catch (Throwable e) {
-		    
+		} catch (Throwable e) {
 		    e.printStackTrace();
 		    printRow(myPrintingKeyPAG_SYSOUT, "Errore in saveWinLog: " + e.getMessage());	
 		} 
 	}
-	
 	// fine YML PG22XX04_02
-	
-	
+
 	//inizio LP PG22XX07
 	private String getTagToXml(String xmlin, String tag) {
     	String init = "<" + tag + ">";
@@ -1196,12 +1137,18 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		
 		if(bAggiornaRTErrate && nodoSpcDao != null) {
 			try {
-				List<NodoSpcRpt> lst = nodoSpcDao.recuperaRPT(null, chiaveTra, codiceIuv, null, idDominio, null);
+				//inizio LP 20240826 - PGNTBNPE-1
+				//List<NodoSpcRpt> lst = nodoSpcDao.recuperaRPT(null, chiaveTra, codiceIuv, null, idDominio, null);
+				List<NodoSpcRpt> lst = nodoSpcDao.recuperaRPTTail(false, null, chiaveTra, codiceIuv, null, idDominio, null);
+				//fine LP 20240826 - PGNTBNPE-1
 				NodoSpcRpt oldRPT = lst.get(0);
 				String oldRT = new String(oldRPT.getRt().getBytes("UTF-8"), "UTF-8");
 				if(oldRT.indexOf("generate=\"PAGONET\"") != -1) {
 					oldRPT.setRt(rtOut);
-					nodoSpcDao.updateRptNodoSpc(oldRPT);
+					//inizio LP 20240826 - PGNTBNPE-1
+					//nodoSpcDao.updateRptNodoSpc(oldRPT);
+					nodoSpcDao.updateRptNodoSpcTail(false, oldRPT);
+					//fine LP 20240826 - PGNTBNPE-1
 				}
 			} catch (DaoException | UnsupportedEncodingException e) {
 				e.printStackTrace();

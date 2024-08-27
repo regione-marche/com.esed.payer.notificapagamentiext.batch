@@ -27,7 +27,7 @@ public class NotificaPagamentiEsterniTest {
 			dsProperties.put(DAOHelper.JDBC_URL, "jdbc:db2://svdbdb201.seda.intra:60000/PAY00DB0:retrieveMessagesFromServerOnGetMessage=true;");
 			dsProperties.put(DAOHelper.JDBC_USER, "SE000SV");
 			dsProperties.put(DAOHelper.JDBC_PASSWORD, "SV!L09SE");
-		} else if(args.length == 1 || args[0].equalsIgnoreCase("mysql")) {
+		} else if(args.length == 1 && args[0].equalsIgnoreCase("mysql")) {
 			schema = "PAY00DB0_SE000SV";
 			dsProperties.put(DAOHelper.JDBC_DRIVER, "com.mysql.jdbc.Driver");
 			dsProperties.put(DAOHelper.JDBC_URL, "jdbc:mysql://10.10.82.181:3306/PAY00DB0_SE000SV");

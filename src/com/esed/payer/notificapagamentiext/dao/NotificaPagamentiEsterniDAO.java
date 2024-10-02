@@ -9,14 +9,16 @@ import java.util.Properties;
 
 import com.esed.payer.notificapagamentiext.config.NotificaPagamentiEsterniContext;
 import com.esed.payer.notificapagamentiext.model.NotificaPagamentiEsterniModel;
+import com.seda.data.dao.DAOHelper;
 import com.seda.data.helper.HelperException;
 import com.seda.payer.core.handler.BaseDaoHandler;
 
 public class NotificaPagamentiEsterniDAO extends BaseDaoHandler {  
-
-	protected CallableStatement callableStatemenLstNEX = null;
-	protected CallableStatement callableStatemenUpdNEX = null;
-	protected CallableStatement callableStatementSelANE = null;
+	//inizio LP 20241002 - PGNTBNPE-1
+	//protected CallableStatement callableStatemenLstNEX = null;
+	//protected CallableStatement callableStatemenUpdNEX = null;
+	//protected CallableStatement callableStatementSelANE = null;
+	//fine LP 20241002 - PGNTBNPE-1
 
 	Properties attributes = new Properties();
 
@@ -40,13 +42,9 @@ public class NotificaPagamentiEsterniDAO extends BaseDaoHandler {
 			String resRevocaValue,
 			boolean bFaiNotifica
 	) throws Exception {
-
 		CallableStatement callableStatement = null;
 		try { 
-			if (callableStatemenUpdNEX == null) {
-				callableStatemenUpdNEX = prepareCall(false, "PYNEXSP_UPD");
-			}
-			callableStatement = callableStatemenUpdNEX; 
+			callableStatement = prepareCall(false, "PYNEXSP_UPD"); 	//inizio LP 20241002 - PGNTBNPE-1
 			callableStatement.setString(1, model.getChiaveTransazione());
 			callableStatement.setString(2, model.getChiaveDettaglioTransazione());	//PG1800XX_014 GG
 			callableStatement.setString(3, model.getCodiceSocieta());
@@ -97,17 +95,15 @@ public class NotificaPagamentiEsterniDAO extends BaseDaoHandler {
 		} catch (HelperException e) {
 			throw new Exception(e);
 		} finally {
+			DAOHelper.closeIgnoringException(callableStatement); //LP 20241002 - PGNTBNPE-1
 		}
 	}
 	
 	public ResultSet listNotificaPagamentiEsterni(NotificaPagamentiEsterniContext notificaPagamentiEsterniContext) throws Exception {
-		CallableStatement callableStatement;
+		CallableStatement callableStatement = null; //LP 20241002 - PGNTBNPE-1
 		ResultSet resultSet = null;
 		try {
-			if(callableStatemenLstNEX == null) {
-				callableStatemenLstNEX = prepareCall(false, "PYNEXSP_LST_BATCH");
-			}
-			callableStatement = callableStatemenLstNEX;
+			callableStatement = prepareCall(false, "PYNEXSP_LST_BATCH"); //LP 20241002 - PGNTBNPE-1
 			callableStatement.setString(1, notificaPagamentiEsterniContext.getCodiceSocieta(notificaPagamentiEsterniContext.getCodiceUtente()));//				IN I_NEX_CSOCCSOC CHAR(5),
 			callableStatement.setString(2, notificaPagamentiEsterniContext.getCodiceUtente());													//				IN I_NEX_CUTECUTE CHAR(5),
 			callableStatement.setString(3, notificaPagamentiEsterniContext.getCodiceEnte(notificaPagamentiEsterniContext.getCodiceUtente()));	//				IN I_NEX_KANEKENT CHAR(10),
@@ -125,21 +121,22 @@ public class NotificaPagamentiEsterniDAO extends BaseDaoHandler {
 			e.printStackTrace();
 			throw e;
 		} finally {
+			DAOHelper.closeIgnoringException(callableStatement); //LP 20241002 - PGNTBNPE-1
 		}
 		return resultSet;
 	}
 	
 	public String selAnagraficaEnti(String codiceEnte) {
-		CallableStatement callableStatement;
+		//inizio LP 20241002 - PGNTBNPE-1
+		CallableStatement callableStatement = null;
+		ResultSet data = null;
+		//fine LP 20241002 - PGNTBNPE-1
 		String ret = null;
 		try {
-			if(callableStatementSelANE ==  null) {
-				callableStatementSelANE = prepareCall(false, "PYANESP_SEL");
-			}
-			callableStatement = callableStatementSelANE; 
+			callableStatement = prepareCall(false, "PYANESP_SEL"); //LP 20241002 - PGNTBNPE-1
 			callableStatement.setString(1, codiceEnte);
 			if (callableStatement.execute()) {
-				ResultSet data = callableStatement.getResultSet();
+				data = callableStatement.getResultSet(); //LP 20241002 - PGNTBNPE-1
 			    if (data.next())
 			    	ret =  data.getString("ANE_CANECENT");
 			}
@@ -147,29 +144,11 @@ public class NotificaPagamentiEsterniDAO extends BaseDaoHandler {
 			e.printStackTrace();
 			return null;
 		} finally {
+			//inizio LP 20241002 - PGNTBNPE-1
+			DAOHelper.closeIgnoringException(data);
+			DAOHelper.closeIgnoringException(callableStatement);
+			//fine LP 20241002 - PGNTBNPE-1
 		}
 		return ret;
 	}
-	
-	@Override
-	public void destroy() {
-		if(callableStatemenUpdNEX !=  null) {
-			try {
-				callableStatemenUpdNEX.close();
-			} catch (Exception e) {
-			}
-		}
-		if(callableStatemenLstNEX !=  null) {
-			try {
-				callableStatemenLstNEX.close();
-			} catch (Exception e) {
-			}
-		}
-		if(callableStatementSelANE !=  null) {
-			try {
-				callableStatementSelANE.close();
-			} catch (Exception e) {
-			}
-		}
-	}	
 }

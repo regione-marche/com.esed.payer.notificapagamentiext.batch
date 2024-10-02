@@ -103,11 +103,8 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		try {
 			this.datasource = datasource;
 			this.schema = schema;
-
-
 			this.jobId = jobId;
 			this.classPrinting = classPrinting;
-
 			preProcess(params);
 			processNotificaPagamenti();
  			postProcess(classPrinting);
@@ -118,10 +115,20 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			e.printStackTrace();
 			printRow(myPrintingKeyPAG_SYSOUT, "Elaborazione completata con errori " + e);
  			printRow(myPrintingKeyPAG_SYSOUT, lineSeparator);
- 			notificaPagamentiEsterniResponse.setCode("30");	//TODO da verificare se mantenere 30 come per altri processi oppure impostare 12
+ 			notificaPagamentiEsterniResponse.setCode("30");	//Da verificare se mantenere 30 come per altri processi oppure impostare 12
  			notificaPagamentiEsterniResponse.setMessage("Operazione terminata con errori ");
+		//inizio LP 20241002 - PGNTBNPE-1
+		} finally {
+			if(notificaPagamentiEsterniDAO != null) {
+				notificaPagamentiEsterniDAO.finalize();
+				notificaPagamentiEsterniDAO = null;
+			}
+			if(nodoSpcDao != null) {
+				nodoSpcDao.finalize();
+				nodoSpcDao = null;
+			}
+		//fine LP 20241002 - PGNTBNPE-1
 		}
-
 		return notificaPagamentiEsterniResponse;
 	}
 
@@ -223,9 +230,9 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			dsProperties.put(DAOHelper.JDBC_PASSWORD, notificaPagamentiEsterniContext.getDatasourceJDBCPassword(notificaPagamentiEsterniContext.getCodiceUtente()));
 			//inizio LP PG200060
 			//if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
-			if(((String) dsProperties.get(DAOHelper.JDBC_DRIVER)).toUpperCase().indexOf("mysql") != -1) { 
+			if(((String) dsProperties.get(DAOHelper.JDBC_DRIVER)).toUpperCase().indexOf("mysql") == -1) { //LP 20241002 era != -1 ? 
 			//fine LP PG200060
-				dsProperties.put("autocommit", "true");		//TODO da verificare
+				dsProperties.put("autocommit", "true");
 			//inizio LP PG200060
 			}
 			//fine LP PG200060
@@ -240,7 +247,10 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		printRow(myPrintingKeyPAG_SYSOUT, "Configurazione caricata da " + fileConf);
 		connection = this.datasource.getConnection();
 		//inizio LP PG200060
-		if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+		//inizio LP 20241002 - PGNTBNPE-1
+		//if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+		if(notificaPagamentiEsterniContext.getDatasourceJDBCDriver(notificaPagamentiEsterniContext.getCodiceUtente()).toUpperCase().indexOf("mysql") == -1) { 
+		//fine LP 20241002 - PGNTBNPE-1
 		//fine LP PG200060
 			connection.setAutoCommit(true);
 		//inizio LP PG200060
@@ -254,7 +264,9 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			nodoSpcDao = null;
 		}
 		//fine LP PG200060
-
+		//inizio LP 20241002 - PGNTBNPE-1
+		notificaPagamentiEsterniDAO = new NotificaPagamentiEsterniDAO(connection, schema);
+		//fine LP 20241002 - PGNTBNPE-1
 	}
 	
 //	private ConfigPagamentoSingleResponse recuperaFunzioneEnte(
@@ -321,16 +333,13 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 		printRow(myPrintingKeyPAG_SYSOUT, lineSeparator);
 		printRow(myPrintingKeyPAG_SYSOUT, "Process " + "Notifica Pagamenti"+ "");
 		printRow(myPrintingKeyPAG_SYSOUT, lineSeparator);
-		
+		ResultSet listNotificaPagamenti = null; //LP 20241002 - PGNTBNPE-1
 		try {
 			printRow(myPrintingKeyPAG_SYSOUT, "Estrazione Pagamenti Esterni non notificate ");
-			//inizio LP 20240826 - PGNTBNPE-1
+			//inizio LP 20241002 - PGNTBNPE-1
 			//CallableStatement callableStatement;
-			ResultSet listNotificaPagamenti = null;
-			if(notificaPagamentiEsterniDAO == null) {
-				notificaPagamentiEsterniDAO = new NotificaPagamentiEsterniDAO(connection, schema);
-			}
-			//fine LP 20240826 - PGNTBNPE-1
+			//ResultSet listNotificaPagamenti = null;
+			//fine LP 20241002 - PGNTBNPE-1
 			try {
 //inizio LP 20240826 - PGNTBNPE-1
 //				callableStatement = Helper.prepareCall(connection, schema, "PYNEXSP_LST_BATCH");
@@ -819,14 +828,18 @@ public class NotificaPagamentiEsterniCore extends BaseServer {
 			printRow(myPrintingKeyPAG_SYSOUT, "Elaborazione completata con errori");
 			throw new Exception(e.getMessage());
 		} finally {
-			//inizio LP 20240826 - PGNTBNPE-1
-			if(notificaPagamentiEsterniDAO != null) {
-				notificaPagamentiEsterniDAO.destroy();
+			//inizio LP 20241002 - PGNTBNPE-1
+			if (listNotificaPagamenti != null){
+				listNotificaPagamenti.close();
+				listNotificaPagamenti = null;
 			}
-			//fine LP 20240826 - PGNTBNPE-1
+			//fine LP 20241002 - PGNTBNPE-1
 			connection.commit();
 			//inizio LP PG200060
-			if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+			//inizio LP 20241002 - PGNTBNPE-1
+			//if(!(notificaPagamentiEsterniContext.getCodiceUtente().equals("000LP") || notificaPagamentiEsterniContext.getCodiceUtente().equals("000RM"))) {
+			if(notificaPagamentiEsterniContext.getDatasourceJDBCDriver(notificaPagamentiEsterniContext.getCodiceUtente()).toUpperCase().indexOf("mysql") == -1) { 
+			//fine LP 20241002 - PGNTBNPE-1
 			//fine LP PG200060
 				connection.setAutoCommit(true);
 			//inizio LP PG200060

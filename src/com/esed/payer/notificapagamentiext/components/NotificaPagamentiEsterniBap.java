@@ -1,10 +1,8 @@
 package com.esed.payer.notificapagamentiext.components;
 
-
 import com.esed.payer.notificapagamentiext.config.NotificaPagamentiEsterniResponse;
 import com.seda.bap.components.core.BapException;
 import com.seda.bap.components.core.spi.ClassRunnableHandler;
-import com.seda.commons.management.ManagementException;
 
 public class NotificaPagamentiEsterniBap extends ClassRunnableHandler {
 	public void run(String[] args) throws BapException {
@@ -33,7 +31,6 @@ public class NotificaPagamentiEsterniBap extends ClassRunnableHandler {
 															 logger(),
 															 this.getJobId());
 //		} catch (ManagementException e) {
-//			// TODO Auto-generated catch block
 //			e.printStackTrace();
 //		}
 		

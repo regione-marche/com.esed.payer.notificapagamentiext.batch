@@ -4,14 +4,14 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.esed.payer.notificapagamentiext.batch</groupId>
 	<artifactId>com.esed.payer.notificapagamentiext.batch</artifactId>
-	<version>2.1.0</version>
+	<version>2.2.0</version>
 	<name>com.esed.payer.notificapagamentiext.batch</name>
 	<description>com.esed.payer.notificapagamentiext.batch</description>
 
    <parent>
       <groupId>it.maggioli.informatica.base.pom</groupId>
       <artifactId>pagonet-base</artifactId>
-      <version>1.4.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
+      <version>1.5.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
       <relativePath/>
    </parent>
 
@@ -106,24 +106,24 @@
 		<dependency>
 			<groupId>com.seda.payer.core</groupId>
 			<artifactId>com.seda.payer.core</artifactId>
-			<version>2.17.2</version>
+			<version>2.19.0</version>
 			<scope>compile</scope>
 		</dependency>
 		<!-- fine LP 20240826 - PGNTBNPE-1 -->
 		<dependency>
 			<groupId>com.seda.emailsender.webservices.client</groupId>
 			<artifactId>com.seda.emailsender.webservices.client</artifactId>
-			<version>1.1.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
+			<version>1.2.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
 		</dependency>
 		<dependency>
 			<groupId>com.seda.payer.integraente.webservice.client</groupId>
 			<artifactId>com.seda.payer.integraente.webservice.client</artifactId>
-			<version>2.2.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
+			<version>2.6.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
 		</dependency>
 		<dependency>
 			<groupId>com.seda.payer.pgec.webservice.client</groupId>
 			<artifactId>com.seda.payer.pgec.webservice.client</artifactId>
-			<version>2.11.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
+			<version>2.12.0</version> <!-- LP 20240826 - PGNTBNPE-1 -->
 			<exclusions>
 				<exclusion>
 				<groupId>com.seda.payer.core</groupId>
